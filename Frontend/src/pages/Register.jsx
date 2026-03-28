@@ -48,10 +48,11 @@ export default function Register() {
           'Accept': 'application/json'
         },
         body: JSON.stringify({ 
-          name: formData.fullName, // Backend Laravel nhận biến tên là 'name'
+          full_name: formData.fullName, // Backend Laravel nhận biến tên là 'name'
           email: formData.email,
           phone: formData.phone,
-          password: formData.password
+          password: formData.password,
+          password_confirmation: formData.confirmPassword 
         })
       });
 
@@ -61,7 +62,7 @@ export default function Register() {
       if (response.ok) {
         // ĐĂNG KÝ THÀNH CÔNG: Lưu Token và tự động Đăng nhập luôn
         localStorage.setItem('userToken', data.token);
-        localStorage.setItem('userName', data.user.name);
+        localStorage.setItem('userName', data.user.full_name);
         localStorage.setItem('userRole', data.user.role);
         
         setIsLoading(false);

@@ -9,13 +9,11 @@ class RoomController extends Controller
 {
     public function index()
     {
-        // Lấy toàn bộ danh sách phòng, kèm theo thông tin của Loại phòng tương ứng
-        // (Nhờ hàm roomType() ta đã định nghĩa trong Model Room lúc trước)
+        // Hàm with('roomType') sẽ tự động JOIN bảng rooms với room_types
+        // để lấy ra tên, giá tiền, sức chứa cho từng phòng.
         $rooms = Room::with('roomType')->get();
 
-        // Trả dữ liệu về dưới định dạng JSON
         return response()->json([
-            'status' => 'success',
             'message' => 'Lấy danh sách phòng thành công',
             'data' => $rooms
         ], 200);

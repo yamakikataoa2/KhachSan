@@ -19,7 +19,7 @@ class AuthController extends Controller
         ]);
 
         $user = User::create([
-            'full_name' => $request->name,
+            'full_name' => $request->full_name,
             'email' => $request->email,
             'password' => Hash::make($request->password), // Mã hóa mật khẩu
             'phone' => $request->phone,

@@ -36,7 +36,7 @@ export default function Login() {
       if (response.ok) {
         // ĐĂNG NHẬP THÀNH CÔNG: Lưu Token thật và Tên thật vào trình duyệt
         localStorage.setItem('userToken', data.token);
-        localStorage.setItem('userName', data.user.name); 
+        localStorage.setItem('userName', data.user.full_name); 
         localStorage.setItem('userRole', data.user.role); // Lưu thêm vai trò (Admin/Khách) để sau này dùng
         
         setIsLoading(false);
