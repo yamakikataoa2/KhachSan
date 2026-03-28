@@ -1,153 +1,158 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-
-// 📦 Dữ liệu mẫu (Đã bổ sung thêm hình ảnh và đổi giá thành số để dễ tính toán)
-const mockRoomDatabase = [
-  { id: 1, name: "Phòng Tiêu Chuẩn", price: 500000, capacity: 2, status: "Available", image: "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=600&auto=format&fit=crop" },
-  { id: 2, name: "Phòng VIP", price: 1200000, capacity: 4, status: "Occupied", image: "https://images.unsplash.com/photo-1590490360182-c33d59735088?q=80&w=600&auto=format&fit=crop" },
-  { id: 3, name: "Phòng Gia Đình", price: 800000, capacity: 4, status: "Available", image: "https://images.unsplash.com/photo-1608198399264-39fe42ca1d2d?q=80&w=600&auto=format&fit=crop" },
-  { id: 4, name: "Phòng Đơn", price: 300000, capacity: 1, status: "Cleaning", image: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=600&auto=format&fit=crop" }
-];
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 
 export default function Booking() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
-  // Trạng thái cho nút Xác nhận (tạo hiệu ứng loading khi bấm)
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🔍 Tìm phòng theo ID
-  const roomDetail = mockRoomDatabase.find((room) => room.id === Number(id));
+  // "Hứng" ID phòng từ URL route parameter
+  const roomId = id;
 
-  // 🛡️ Bắt lỗi nếu URL sai ID
-  if (!roomDetail) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50 px-4">
-        <div className="text-6xl mb-4">🔍</div>
-        <h2 className="text-3xl font-bold text-gray-800">Không tìm thấy phòng</h2>
-        <p className="mt-4 text-gray-600 mb-8 text-center">Rất tiếc, căn phòng bạn đang tìm kiếm không tồn tại hoặc đã bị gỡ.</p>
-        <Link to="/rooms" className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold hover:bg-blue-700 transition shadow-md hover:shadow-lg">
-          ← Quay lại danh sách phòng
-        </Link>
-      </div>
-    );
-  }
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    room_id: roomId || '',
+    customer_name: localStorage.getItem('userName') || '', // Tự động lấy tên nếu đã Login
+    customer_phone: '',
+    check_in_date: '',
+    check_out_date: '',
+    note: ''
+  });
 
-  // 🧮 Tính toán chi phí (Giả sử khách đặt 1 đêm, tính thêm 10% VAT)
-  const vatAmount = roomDetail.price * 0.1;
-  const totalAmount = roomDetail.price + vatAmount;
+  // Nếu khách mâm men vào thẳng đường dẫn /booking mà chưa chọn phòng, đuổi về trang Rooms
+  useEffect(() => {
+    if (!roomId) {
+      alert("Vui lòng chọn phòng trước khi tiến hành đặt!");
+      navigate('/rooms');
+    }
+  }, [roomId, navigate]);
 
-  // Hàm xử lý khi bấm nút "Xác nhận đặt phòng"
-  const handleSubmit = (e) => {
-    e.preventDefault(); // Chặn hành vi tải lại trang mặc định của Form
-    setIsSubmitting(true);
-    
-    // Giả lập thời gian gửi dữ liệu lên Backend mất 2 giây
-    setTimeout(() => {
-      alert("🎉 Đặt phòng thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.");
-      navigate('/'); // Đẩy người dùng về trang chủ
-    }, 2000);
+  // Xử lý khi khách bấm Đặt Phòng
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Kiểm tra logic ngày tháng cơ bản
+    const checkIn = new Date(formData.check_in_date);
+    const checkOut = new Date(formData.check_out_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (checkIn < today) {
+      alert("Ngày nhận phòng không được ở trong quá khứ!");
+      return;
+    }
+    if (checkIn >= checkOut) {
+      alert("Ngày trả phòng phải diễn ra SAU ngày nhận phòng!");
+      return;
+    }
+
+    // Yêu cầu đăng nhập mới được đặt phòng (Tùy chọn, bạn có thể bỏ qua nếu muốn khách vãng lai cũng đặt được)
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      alert("Vui lòng đăng nhập để hệ thống ghi nhận đơn đặt phòng của bạn!");
+      navigate('/login');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Gọi API gửi đơn lên Laravel (Chúng ta sẽ viết API này ở bước sau)
+      const response = await fetch('http://localhost:8000/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        alert("🎉 Đặt phòng thành công! Cảm ơn bạn đã lựa chọn khách sạn của chúng tôi.");
+        navigate('/'); // Đẩy về trang chủ
+      } else {
+        const errorData = await response.json();
+        alert("Lỗi: " + (errorData.message || "Vui lòng kiểm tra lại thông tin."));
+      }
+    } catch (error) {
+      console.error("Lỗi gửi đơn:", error);
+      alert("Không thể kết nối đến hệ thống. Vui lòng thử lại sau.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="bg-gray-50 min-h-screen py-16">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-900">Hoàn Tất Đặt Phòng</h1>
-          <p className="mt-2 text-gray-600">Vui lòng điền thông tin bên dưới để xác nhận giữ chỗ.</p>
-        </div>
-
-        <div className="flex flex-col lg:flex-row gap-8">
+        {/* Card Đặt Phòng */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           
-          {/* CỘT TRÁI: FORM ĐIỀN THÔNG TIN */}
-          <div className="lg:w-2/3">
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Thông tin liên hệ</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Họ và tên *</label>
-                  <input required type="text" placeholder="VD: Nguyễn Văn A" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại *</label>
-                  <input required type="tel" placeholder="VD: 0912345678" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition" />
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Địa chỉ Email</label>
-                <input type="email" placeholder="VD: email@example.com" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ngày nhận phòng *</label>
-                  <input required type="date" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ngày trả phòng *</label>
-                  <input required type="date" className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition" />
-                </div>
-              </div>
-
-              <div className="mb-8">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Ghi chú đặc biệt (Tùy chọn)</label>
-                <textarea rows="3" placeholder="Yêu cầu đón sân bay, giường phụ..." className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"></textarea>
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={isSubmitting}
-                className={`w-full py-4 rounded-xl font-bold text-white text-lg transition duration-300 shadow-md flex justify-center items-center gap-2
-                  ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg transform hover:-translate-y-1'}
-                `}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Đang xử lý...
-                  </>
-                ) : (
-                  'Xác nhận & Thanh toán'
-                )}
-              </button>
-            </form>
+          {/* Header Card */}
+          <div className="bg-blue-600 p-6 text-white text-center">
+            <h1 className="text-3xl font-extrabold mb-2">Xác Nhận Đặt Phòng</h1>
+            <p className="text-blue-100">Vui lòng điền thông tin để hoàn tất giữ chỗ</p>
           </div>
 
-          {/* CỘT PHẢI: TÓM TẮT ĐƠN HÀNG */}
-          <div className="lg:w-1/3">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden sticky top-28">
-              {/* Ảnh phòng */}
-              <div className="h-48 overflow-hidden">
-                <img src={roomDetail.image} alt={roomDetail.name} className="w-full h-full object-cover" />
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            
+            {/* Thông tin phòng (Đọc từ URL, chỉ hiển thị không cho sửa) */}
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-600 font-bold uppercase tracking-wider">Phòng đang chọn</p>
+                <p className="text-2xl font-black text-gray-900">{roomNumber}</p>
               </div>
-              
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{roomDetail.name}</h3>
-                <p className="text-gray-600 flex items-center gap-2 mb-6">
-                  <span>👥</span> Sức chứa tối đa: {roomDetail.capacity} người
-                </p>
+              <div className="text-4xl">🏨</div>
+            </div>
 
-                <div className="space-y-4 border-t border-b py-6 mb-6 text-gray-700">
-                  <div className="flex justify-between">
-                    <span>Giá phòng (1 đêm)</span>
-                    <span className="font-semibold">{roomDetail.price.toLocaleString('vi-VN')} đ</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Thuế & Phí (10%)</span>
-                    <span className="font-semibold">{vatAmount.toLocaleString('vi-VN')} đ</span>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cột 1: Thông tin khách hàng */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-bold text-gray-900 border-b pb-2">1. Thông tin liên hệ</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Họ và Tên *</label>
+                  <input type="text" required value={formData.customer_name} onChange={(e) => setFormData({...formData, customer_name: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none transition" placeholder="VD: Nguyễn Văn A" />
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold text-gray-800">Tổng cộng</span>
-                  <span className="text-3xl font-extrabold text-orange-600">{totalAmount.toLocaleString('vi-VN')} đ</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại *</label>
+                  <input type="tel" required value={formData.customer_phone} onChange={(e) => setFormData({...formData, customer_phone: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none transition" placeholder="VD: 0912345678" />
+                </div>
+              </div>
+
+              {/* Cột 2: Thời gian lưu trú */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-bold text-gray-900 border-b pb-2">2. Thời gian lưu trú</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nhận phòng (Check-in) *</label>
+                  <input type="date" required value={formData.check_in_date} onChange={(e) => setFormData({...formData, check_in_date: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none transition" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ngày trả phòng (Check-out) *</label>
+                  <input type="date" required value={formData.check_out_date} onChange={(e) => setFormData({...formData, check_out_date: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none transition" />
                 </div>
               </div>
             </div>
-          </div>
+
+            {/* Ghi chú thêm */}
+            <div className="pt-4 border-t">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú đặc biệt (Không bắt buộc)</label>
+              <textarea rows="3" value={formData.note} onChange={(e) => setFormData({...formData, note: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none transition resize-none" placeholder="Bạn có yêu cầu gì thêm không? (VD: Cần thêm gối, đón tại sân bay...)"></textarea>
+            </div>
+
+            {/* Nút Submit */}
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex justify-center items-center gap-2 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/30'}`}
+            >
+              {isLoading ? 'Đang xử lý...' : 'Hoàn Tất Đặt Phòng'}
+            </button>
+          </form>
 
         </div>
       </div>

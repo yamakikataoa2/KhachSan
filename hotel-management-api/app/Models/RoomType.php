@@ -9,7 +9,7 @@ class RoomType extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'base_price', 'max_occupancy'];
+    protected $fillable = ['name', 'description', 'base_price', 'max_occupancy', 'image'];
 
     // Khai báo: Một Loại phòng có thể CÓ NHIỀU phòng
     public function rooms()

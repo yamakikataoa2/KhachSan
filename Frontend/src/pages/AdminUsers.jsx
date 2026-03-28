@@ -1,12 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AdminUsers() {
-  // 1. Mock Data bám sát cấu trúc bảng users
-  const [users, setUsers] = useState([
-    { id: 1, full_name: "Admin Tổng", email: "admin@hotelabc.com", phone: "0999888777", role: "admin", created_at: "2026-01-01" },
-    { id: 2, full_name: "Lễ Tân Ca Sáng", email: "letan1@hotelabc.com", phone: "0912345678", role: "staff", created_at: "2026-02-15" },
-    { id: 3, full_name: "Nguyễn Văn Khách", email: "khachhang@gmail.com", phone: "0901112223", role: "customer", created_at: "2026-03-20" },
-  ]);
+  // 1. Khởi tạo mảng rỗng thay vì mock data
+  const [users, setUsers] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -15,11 +11,37 @@ export default function AdminUsers() {
     id: null, full_name: '', email: '', phone: '', role: 'customer', password: ''
   });
 
-  // 2. Xử lý mở Modal
+  // Lấy Token từ trình duyệt để xác thực quyền Admin
+  const token = localStorage.getItem('userToken');
+
+  // 2. HÀM TẢI DANH SÁCH TÀI KHOẢN TỪ BACKEND
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data.data); // Gán dữ liệu thật vào state
+      }
+    } catch (error) {
+      console.error("Lỗi tải danh sách:", error);
+    }
+  };
+
+  // Tự động gọi API khi vừa mở trang
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Xử lý mở Modal
   const openModal = (user = null) => {
     if (user) {
       setIsEditing(true);
-      setFormData({ ...user, password: '' }); // Khi sửa không hiện lại pass cũ
+      setFormData({ ...user, password: '' });
     } else {
       setIsEditing(false);
       setFormData({ id: null, full_name: '', email: '', phone: '', role: 'customer', password: '' });
@@ -27,30 +49,60 @@ export default function AdminUsers() {
     setIsModalOpen(true);
   };
 
-  // 3. Xử lý Lưu dữ liệu
-  const handleSave = (e) => {
+  // 3. HÀM LƯU (THÊM / SỬA) TÀI KHOẢN LÊN BACKEND
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (isEditing) {
-      setUsers(users.map(u => u.id === formData.id ? { ...u, ...formData } : u));
-    } else {
-      const newUser = { ...formData, id: Date.now(), created_at: new Date().toISOString().split('T')[0] };
-      setUsers([...users, newUser]);
+    const url = isEditing ? `http://localhost:8000/api/users/${formData.id}` : 'http://localhost:8000/api/users';
+    const method = isEditing ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        alert(isEditing ? "Cập nhật thành công!" : "Tạo tài khoản thành công!");
+        setIsModalOpen(false);
+        fetchUsers(); // Gọi lại API để làm mới bảng
+      } else {
+        const errorData = await response.json();
+        alert("Lỗi: " + (errorData.message || "Vui lòng kiểm tra lại thông tin"));
+      }
+    } catch (error) {
+      console.error("Lỗi lưu tài khoản:", error);
     }
-    setIsModalOpen(false);
   };
 
-  // 4. Xử lý Xóa
-  const handleDelete = (id, role) => {
+  // 4. HÀM XÓA TÀI KHOẢN
+  const handleDelete = async (id, role) => {
     if (role === 'admin') {
       alert("Không thể xóa tài khoản Admin gốc từ giao diện này!");
       return;
     }
     if (window.confirm("Bạn có chắc chắn muốn xóa tài khoản này?")) {
-      setUsers(users.filter(u => u.id !== id));
+      try {
+        const response = await fetch(`http://localhost:8000/api/users/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+        if (response.ok) {
+          fetchUsers(); // Làm mới bảng sau khi xóa
+        }
+      } catch (error) {
+        console.error("Lỗi xóa tài khoản:", error);
+      }
     }
   };
 
-  // Render Badge Vai trò
   const getRoleBadge = (role) => {
     switch (role) {
       case 'admin': return <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Quản Trị Viên</span>;
@@ -98,13 +150,19 @@ export default function AdminUsers() {
                     <p className="text-xs text-gray-500 mt-1">{user.phone}</p>
                   </td>
                   <td className="p-4">{getRoleBadge(user.role)}</td>
-                  <td className="p-4 text-sm text-gray-600">{user.created_at}</td>
+                  {/* Format lại ngày tháng từ Laravel */}
+                  <td className="p-4 text-sm text-gray-600">{new Date(user.created_at).toLocaleDateString('vi-VN')}</td>
                   <td className="p-4 flex justify-center gap-3">
                     <button onClick={() => openModal(user)} className="text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1 rounded">Sửa</button>
                     <button onClick={() => handleDelete(user.id, user.role)} className="text-red-600 hover:text-red-800 font-medium bg-red-50 px-3 py-1 rounded">Xóa</button>
                   </td>
                 </tr>
               ))}
+              {users.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -113,7 +171,7 @@ export default function AdminUsers() {
       {/* Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
             <div className="bg-indigo-600 p-5 text-white flex justify-between items-center">
               <h2 className="text-xl font-bold">{isEditing ? '✏️ Cập Nhật Tài Khoản' : '✨ Tạo Tài Khoản'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-white text-2xl leading-none">&times;</button>
@@ -145,7 +203,7 @@ export default function AdminUsers() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{isEditing ? 'Mật khẩu mới (Tùy chọn)' : 'Mật khẩu *'}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{isEditing ? 'Mật khẩu mới' : 'Mật khẩu *'}</label>
                   <input type="password" required={!isEditing} value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none" placeholder={isEditing ? "Để trống nếu giữ nguyên" : "Nhập mật khẩu"}/>
                 </div>
               </div>

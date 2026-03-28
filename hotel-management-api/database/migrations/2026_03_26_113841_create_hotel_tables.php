@@ -18,6 +18,7 @@ return new class extends Migration
         $table->text('description')->nullable();
         $table->decimal('base_price', 15, 2);
         $table->integer('max_occupancy');
+        $table->timestamps();
     });
 
     // 2. Bảng Phòng [cite: 2]
@@ -26,6 +27,7 @@ return new class extends Migration
         $table->string('room_number', 10)->unique();
         $table->foreignId('room_type_id')->constrained('room_types');
         $table->enum('status', ['Available', 'Occupied', 'Cleaning', 'Maintenance'])->default('Available');
+        $table->timestamps();
     });
 
     // 3. Bảng Đặt phòng [cite: 4]

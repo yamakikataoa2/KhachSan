@@ -8,6 +8,7 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\RoomTypeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\UserController;
 
 // --- NHÓM API CÔNG KHAI (Không cần Token) ---
 Route::post('/register', [AuthController::class, 'register']);
@@ -17,6 +18,15 @@ Route::get('/rooms', [RoomController::class, 'index']); // Xem danh sách phòng
 // --- NHÓM API BẢO MẬT (Bắt buộc có Token) ---
 Route::middleware('auth:sanctum')->group(function () {
     
+
+    Route::get('/room-types', [RoomTypeController::class, 'index']);
+
+    // API Quản lý Loại phòng
+    Route::get('/room-types', [RoomTypeController::class, 'index']);
+    Route::post('/room-types', [RoomTypeController::class, 'store']);
+    Route::put('/room-types/{id}', [RoomTypeController::class, 'update']);
+    Route::delete('/room-types/{id}', [RoomTypeController::class, 'destroy']);
+
     // API mặc định lấy thông tin user
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -38,4 +48,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/rooms/{id}', [RoomController::class, 'destroy']); // API Xóa phòng
     Route::put('/bookings/{id}/status', [BookingController::class, 'updateStatus']); // Cập nhật trạng thái đơn
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);        // Xem thống kê doanh thu
+
+
+    // API Quản lý Tài khoản (Thêm vào đây)
+    Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{id}', [UserController::class, 'update']);
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
 });

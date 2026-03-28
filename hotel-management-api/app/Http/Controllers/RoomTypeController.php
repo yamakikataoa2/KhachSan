@@ -2,40 +2,90 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\RoomType;
 use Illuminate\Http\Request;
-use App\Models\RoomType; // Nhớ gọi Model này vào
+use Illuminate\Support\Facades\Storage;
 
 class RoomTypeController extends Controller
 {
+    // Lấy danh sách Loại phòng
+    public function index()
+    {
+        return response()->json([
+            'data' => RoomType::orderBy('id', 'desc')->get()
+        ], 200);
+    }
+
+    // Thêm Loại phòng mới
     public function store(Request $request)
     {
-        // 1. Kiểm tra quyền (Chỉ admin hoặc staff mới được thêm)
-        if ($request->user()->role !== 'admin' && $request->user()->role !== 'staff') {
-            return response()->json([
-                'message' => 'Bạn không có quyền thực hiện chức năng này!'
-            ], 403); // 403 Forbidden
+        $request->validate([
+            'name' => 'required|string|unique:room_types,name',
+            'base_price' => 'required|numeric|min:0',
+            'max_occupancy' => 'required|integer|min:1',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:51200'
+        ]);
+
+        $data = $request->all();
+
+        // Xử lý upload ảnh
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('room_types', 'public');
+            $data['image'] = $imagePath;
         }
 
-        // 2. Validate dữ liệu gửi lên
+        $roomType = RoomType::create($data);
+
+        return response()->json(['message' => 'Thêm loại phòng thành công', 'data' => $roomType], 201);
+    }
+
+    // Cập nhật Loại phòng
+    public function update(Request $request, $id)
+    {
+        $roomType = RoomType::findOrFail($id);
+
         $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'name' => 'required|string|unique:room_types,name,' . $id,
             'base_price' => 'required|numeric|min:0',
-            'max_occupancy' => 'required|integer|min:1'
+            'max_occupancy' => 'required|integer|min:1',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:51200'
         ]);
 
-        // 3. Lưu vào Database
-        $roomType = RoomType::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'base_price' => $request->base_price,
-            'max_occupancy' => $request->max_occupancy
-        ]);
+        $data = $request->all();
 
-        // 4. Trả về kết quả
-        return response()->json([
-            'message' => 'Thêm Loại phòng mới thành công!',
-            'data' => $roomType
-        ], 201);
+        // Xử lý upload ảnh mới
+        if ($request->hasFile('image')) {
+            // Xóa ảnh cũ nếu có
+            if ($roomType->image && Storage::disk('public')->exists($roomType->image)) {
+                Storage::disk('public')->delete($roomType->image);
+            }
+            $imagePath = $request->file('image')->store('room_types', 'public');
+            $data['image'] = $imagePath;
+        }
+
+        $roomType->update($data);
+
+        return response()->json(['message' => 'Cập nhật thành công', 'data' => $roomType]);
+    }
+
+    // Xóa Loại phòng
+    public function destroy($id)
+    {
+        $roomType = RoomType::findOrFail($id);
+        
+        // Kiểm tra xem có phòng nào đang dùng loại này không (nếu có thì không cho xóa)
+        if ($roomType->rooms()->count() > 0) {
+            return response()->json(['message' => 'Không thể xóa vì đang có phòng thuộc loại này!'], 400);
+        }
+
+        // Xóa ảnh nếu có
+        if ($roomType->image && Storage::disk('public')->exists($roomType->image)) {
+            Storage::disk('public')->delete($roomType->image);
+        }
+
+        $roomType->delete();
+        return response()->json(['message' => 'Xóa loại phòng thành công']);
     }
 }

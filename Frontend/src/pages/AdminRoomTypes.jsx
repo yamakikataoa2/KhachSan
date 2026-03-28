@@ -1,72 +1,130 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AdminRoomTypes() {
-  // 1. Mock Data bám sát cấu trúc bảng room_types trong MySQL
-  const [roomTypes, setRoomTypes] = useState([
-    { 
-      id: 1, 
-      name: "Phòng Tiêu Chuẩn (Standard)", 
-      description: "Phòng cơ bản với đầy đủ tiện nghi, phù hợp cho cá nhân hoặc cặp đôi.", 
-      base_price: 500000, 
-      max_occupancy: 2 
-    },
-    { 
-      id: 2, 
-      name: "Phòng VIP (Suite)", 
-      description: "Không gian rộng rãi, view toàn cảnh thành phố, nội thất cao cấp.", 
-      base_price: 1500000, 
-      max_occupancy: 4 
-    },
-    { 
-      id: 3, 
-      name: "Phòng Gia Đình (Family)", 
-      description: "Phòng đôi kết nối, có khu vực sinh hoạt chung và bếp mini.", 
-      base_price: 1200000, 
-      max_occupancy: 5 
-    }
-  ]);
-
-  // 2. Quản lý trạng thái Modal
+  const [roomTypes, setRoomTypes] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
   
-  // State lưu dữ liệu form (Khớp với các cột trong DB)
   const [formData, setFormData] = useState({
-    id: null,
-    name: '',
-    description: '',
-    base_price: '',
-    max_occupancy: 1
+    id: null, name: '', base_price: '', max_occupancy: '', description: '', image: null
   });
 
-  // 3. Mở Modal Thêm/Sửa
+  const token = localStorage.getItem('userToken');
+
+  // 1. Tải danh sách Loại Phòng
+  const fetchRoomTypes = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/room-types', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRoomTypes(data.data);
+      }
+    } catch (error) {
+      console.error("Lỗi tải danh sách:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchRoomTypes();
+  }, []);
+
+  // 2. Mở Modal
   const openModal = (type = null) => {
     if (type) {
       setIsEditing(true);
-      setFormData(type);
+      setFormData({ ...type, image: null });
+      setImagePreview(type.image ? `http://localhost:8000/storage/${type.image}` : null);
     } else {
       setIsEditing(false);
-      setFormData({ id: null, name: '', description: '', base_price: '', max_occupancy: 1 });
+      setFormData({ id: null, name: '', base_price: '', max_occupancy: '', description: '', image: null });
+      setImagePreview(null);
     }
     setIsModalOpen(true);
   };
 
-  // 4. Xử lý Lưu dữ liệu
-  const handleSave = (e) => {
-    e.preventDefault();
-    if (isEditing) {
-      setRoomTypes(roomTypes.map(rt => rt.id === formData.id ? formData : rt));
-    } else {
-      const newType = { ...formData, id: Date.now() }; // Fake ID auto_increment
-      setRoomTypes([...roomTypes, newType]);
+  // 3. Xử lý thay đổi ảnh
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({...formData, image: file});
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
-    setIsModalOpen(false);
   };
 
-  // 5. Xử lý Xóa
-  const handleDelete = (id) => {
-    if (window.confirm("Cảnh báo: Xóa loại phòng này có thể ảnh hưởng đến các phòng đang sử dụng nó. Bạn có chắc chắn?")) {
-      setRoomTypes(roomTypes.filter(rt => rt.id !== id));
+  // 4. Lưu dữ liệu (Thêm/Sửa)
+  const handleSave = async (e) => {
+    e.preventDefault();
+    const url = isEditing ? `http://localhost:8000/api/room-types/${formData.id}` : 'http://localhost:8000/api/room-types';
+    const method = isEditing ? 'POST' : 'POST'; // Laravel sử dụng POST cho update với _method
+
+    try {
+      // Tạo FormData để gửi file
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('base_price', formData.base_price);
+      data.append('max_occupancy', formData.max_occupancy);
+      data.append('description', formData.description);
+      if (formData.image instanceof File) {
+        data.append('image', formData.image);
+      }
+      if (isEditing) {
+        data.append('_method', 'PUT');
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: data
+      });
+
+      if (response.ok) {
+        alert(isEditing ? "Cập nhật thành công!" : "Thêm loại phòng thành công!");
+        setIsModalOpen(false);
+        fetchRoomTypes();
+      } else {
+        const errorData = await response.json();
+        alert("Lỗi: " + (errorData.message || "Vui lòng kiểm tra lại thông tin"));
+      }
+    } catch (error) {
+      console.error("Lỗi lưu:", error);
+      alert("Lỗi kết nối, vui lòng thử lại!");
+    }
+  };
+
+  // 5. Xóa Loại Phòng
+  const handleDelete = async (id) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa loại phòng này?")) {
+      try {
+        const response = await fetch(`http://localhost:8000/api/room-types/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          fetchRoomTypes();
+        } else {
+          const errorData = await response.json();
+          alert("Lỗi: " + errorData.message);
+        }
+      } catch (error) {
+        console.error("Lỗi xóa:", error);
+      }
     }
   };
 
@@ -78,50 +136,52 @@ export default function AdminRoomTypes() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-200 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản Lý Loại Phòng</h1>
-            <p className="text-gray-500 text-sm mt-1">Định nghĩa các hạng phòng, giá gốc và sức chứa</p>
+            <p className="text-gray-500 text-sm mt-1">Thiết lập cấu hình, giá cả và sức chứa cho các hạng phòng</p>
           </div>
-          <button 
-            onClick={() => openModal()}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-bold transition shadow-md flex items-center gap-2"
-          >
+          <button onClick={() => openModal()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-bold transition shadow-md flex items-center gap-2">
             <span className="text-xl">+</span> Thêm Loại Phòng
           </button>
         </div>
 
-        {/* Table */}
+        {/* Bảng Danh Sách */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
+          <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="p-4 font-semibold text-gray-600 w-16">ID</th>
-                <th className="p-4 font-semibold text-gray-600 w-1/4">Tên Loại Phòng</th>
-                <th className="p-4 font-semibold text-gray-600 w-1/3">Mô Tả</th>
-                <th className="p-4 font-semibold text-gray-600">Giá Gốc (VNĐ)</th>
+                <th className="p-4 font-semibold text-gray-600 w-20">Ảnh</th>
+                <th className="p-4 font-semibold text-gray-600 w-1/5">Tên Hạng Phòng</th>
+                <th className="p-4 font-semibold text-gray-600 w-1/5">Giá Cơ Bản</th>
                 <th className="p-4 font-semibold text-gray-600 text-center">Sức Chứa</th>
+                <th className="p-4 font-semibold text-gray-600 w-1/4">Mô Tả</th>
                 <th className="p-4 font-semibold text-gray-600 text-center">Hành Động</th>
               </tr>
             </thead>
             <tbody>
               {roomTypes.map((type) => (
                 <tr key={type.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                  <td className="p-4 text-gray-500 font-medium">{type.id}</td>
-                  <td className="p-4 font-bold text-gray-800">{type.name}</td>
-                  <td className="p-4 text-gray-600 text-sm">
-                    {/* Giới hạn độ dài mô tả để bảng không bị vỡ */}
-                    <p className="line-clamp-2">{type.description}</p>
+                  <td className="p-4">
+                    {type.image ? (
+                      <img src={`http://localhost:8000/storage/${type.image}`} alt={type.name} className="w-16 h-16 object-cover rounded-lg" />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">📸</div>
+                    )}
                   </td>
-                  <td className="p-4 text-orange-600 font-bold">{Number(type.base_price).toLocaleString('vi-VN')} đ</td>
-                  <td className="p-4 text-gray-700 text-center font-medium">👤 {type.max_occupancy}</td>
-                  <td className="p-4 flex justify-center gap-3">
-                    <button onClick={() => openModal(type)} className="text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1 rounded">Sửa</button>
-                    <button onClick={() => handleDelete(type.id)} className="text-red-600 hover:text-red-800 font-medium bg-red-50 px-3 py-1 rounded">Xóa</button>
+                  <td className="p-4 font-bold text-gray-800">{type.name}</td>
+                  <td className="p-4 text-indigo-600 font-bold">
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(type.base_price)}
+                  </td>
+                  <td className="p-4 text-center font-medium text-gray-700">{type.max_occupancy}</td>
+                  <td className="p-4 text-sm text-gray-500 line-clamp-1">{type.description || 'Chưa có'}</td>
+                  <td className="p-4">
+                    <div className="flex justify-center gap-3">
+                      <button onClick={() => openModal(type)} className="text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1 rounded">Sửa</button>
+                      <button onClick={() => handleDelete(type.id)} className="text-red-600 hover:text-red-800 font-medium bg-red-50 px-3 py-1 rounded">Xóa</button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {roomTypes.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="p-8 text-center text-gray-500">Chưa có dữ liệu. Hãy thêm loại phòng đầu tiên!</td>
-                </tr>
+                <tr><td colSpan="6" className="p-8 text-center text-gray-500">Chưa có loại phòng nào</td></tr>
               )}
             </tbody>
           </table>
@@ -131,65 +191,48 @@ export default function AdminRoomTypes() {
       {/* Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-fade-in-up">
-            <div className="bg-indigo-600 p-5 text-white flex justify-between items-center">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up max-h-[90vh] overflow-y-auto">
+            <div className="bg-indigo-600 p-5 text-white flex justify-between items-center sticky top-0">
               <h2 className="text-xl font-bold">{isEditing ? '✏️ Cập Nhật Loại Phòng' : '✨ Thêm Loại Phòng Mới'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-white hover:text-gray-200 text-2xl leading-none">&times;</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-white text-2xl leading-none">&times;</button>
             </div>
             
-            <form onSubmit={handleSave} className="p-6 space-y-5">
+            <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tên loại phòng (name) *</label>
-                <input 
-                  type="text" required value={formData.name} 
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none transition" 
-                  placeholder="VD: Phòng Suite Cao Cấp"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Ảnh Loại Phòng</label>
+                <div className="flex flex-col items-center gap-3">
+                  {imagePreview && (
+                    <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-lg border-2 border-indigo-300" />
+                  )}
+                  <input type="file" accept="image/*" onChange={handleImageChange} className="w-full px-3 py-2 border rounded-lg cursor-pointer hover:border-indigo-400" />
+                  <p className="text-xs text-gray-500 text-center">Chỉ cho phép: PNG, JPG, GIF. Kích thước tối đa: 50MB</p>
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả chi tiết (description) *</label>
-                <textarea 
-                  required rows="3" value={formData.description} 
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none transition resize-none" 
-                  placeholder="Mô tả các tiện nghi, view, diện tích..."
-                ></textarea>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên Hạng Phòng *</label>
+                <input type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none" placeholder="VD: Phòng VIP, Tiêu Chuẩn..." />
               </div>
               
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Giá gốc / Đêm (base_price) *</label>
-                  <div className="relative">
-                    <input 
-                      type="number" required min="0" value={formData.base_price} 
-                      onChange={(e) => setFormData({...formData, base_price: e.target.value})}
-                      className="w-full pl-4 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none transition" 
-                    />
-                    <span className="absolute right-4 top-2 text-gray-500">VNĐ</span>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Giá Cơ Bản (VNĐ) *</label>
+                  <input type="number" required min="0" value={formData.base_price} onChange={(e) => setFormData({...formData, base_price: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none" placeholder="VD: 500000" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sức chứa tối đa (max_occupancy) *</label>
-                  <div className="relative">
-                    <input 
-                      type="number" required min="1" max="20" value={formData.max_occupancy} 
-                      onChange={(e) => setFormData({...formData, max_occupancy: e.target.value})}
-                      className="w-full pl-4 pr-16 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none transition" 
-                    />
-                     <span className="absolute right-4 top-2 text-gray-500">Người</span>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sức Chứa Tối Đa *</label>
+                  <input type="number" required min="1" value={formData.max_occupancy} onChange={(e) => setFormData({...formData, max_occupancy: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none" placeholder="Số người" />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-8 border-t pt-5">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition">
-                  Hủy bỏ
-                </button>
-                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-md">
-                  {isEditing ? 'Lưu Thay Đổi' : 'Tạo Loại Phòng'}
-                </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mô Tả Chi Tiết</label>
+                <textarea rows="3" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none resize-none" placeholder="Mô tả về tiện ích, view phòng..."></textarea>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 border-t pt-4 sticky bottom-0 bg-white">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">Hủy</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 shadow-md">Lưu Lại</button>
               </div>
             </form>
           </div>
