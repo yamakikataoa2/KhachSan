@@ -1,11 +1,8 @@
+import { Link } from 'react-router-dom';
+import { SERVICES } from '../data/services';
+
 export default function Services() {
-  // Dữ liệu mẫu cho các dịch vụ của khách sạn
-  const services = [
-    { id: 1, name: "Nhà hàng & Bar 5 Sao", icon: "🍽️", description: "Thưởng thức tinh hoa ẩm thực Á - Âu từ các đầu bếp trứ danh trong không gian lãng mạn.", image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=600&auto=format&fit=crop" },
-    { id: 2, name: "Spa & Massage Trị Liệu", icon: "💆‍♀️", description: "Đánh thức mọi giác quan và tái tạo năng lượng hoàn hảo với các liệu pháp thảo dược tự nhiên.", image: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=600&auto=format&fit=crop" },
-    { id: 3, name: "Hồ Bơi Vô Cực Nước Ấm", icon: "🏊‍♂️", description: "Đắm mình trong làn nước xanh mát, nhâm nhi ly cocktail và ngắm nhìn toàn cảnh thành phố từ trên cao.", image: "https://images.unsplash.com/photo-1582604662095-dc195bb21556?q=80&w=600&auto=format&fit=crop" },
-    { id: 4, name: "Phòng Gym Hiện Đại 24/7", icon: "🏋️‍♂️", description: "Duy trì thói quen rèn luyện sức khỏe ngay cả trong kỳ nghỉ với hệ thống máy móc tập luyện tối tân nhất.", image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=600&auto=format&fit=crop" }
-  ];
+  const services = SERVICES;
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
@@ -34,9 +31,12 @@ export default function Services() {
                 <div className="text-4xl mb-4">{svc.icon}</div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-3">{svc.name}</h3>
                 <p className="text-gray-600 leading-relaxed">{svc.description}</p>
-                <button className="mt-6 self-start text-blue-600 font-bold hover:text-blue-800 flex items-center gap-2 transition group-hover:translate-x-2">
+                <Link
+                  to={`/services/${svc.slug || svc.id}`}
+                  className="mt-6 self-start text-blue-600 font-bold hover:text-blue-800 flex items-center gap-2 transition group-hover:translate-x-2"
+                >
                   Tìm hiểu thêm <span className="text-xl">→</span>
-                </button>
+                </Link>
               </div>
 
             </div>

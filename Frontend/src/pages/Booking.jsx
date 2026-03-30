@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config/env';
 
 export default function Booking() {
   const { id } = useParams();
@@ -57,7 +58,7 @@ export default function Booking() {
 
     try {
       // Gọi API gửi đơn lên Laravel (Chúng ta sẽ viết API này ở bước sau)
-      const response = await fetch('http://localhost:8000/api/bookings', {
+      const response = await fetch(`${API_BASE_URL}/api/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

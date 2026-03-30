@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Rooms from './pages/Rooms';
 import Booking from './pages/Booking';
 import Services from './pages/Services';
+import ServiceDetail from './pages/ServiceDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -60,6 +61,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/rooms" element={<Rooms />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/services/:slugOrId" element={<ServiceDetail />} />
           <Route path="/booking/:id" element={<Booking />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

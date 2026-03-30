@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/env';
 
 export default function AdminRooms() {
   const [rooms, setRooms] = useState([]);
@@ -13,32 +14,34 @@ export default function AdminRooms() {
 
   const token = localStorage.getItem('userToken');
 
-  // 1. Hàm gọi API lấy dữ liệu Phòng và Loại Phòng
-  const fetchData = async () => {
-    try {
-      // Lấy danh sách phòng
-      const resRooms = await fetch('http://localhost:8000/api/rooms');
-      if (resRooms.ok) {
-        const dataRooms = await resRooms.json();
-        setRooms(dataRooms.data);
-      }
-
-      // Lấy danh sách loại phòng (Bắt buộc phải có token vì đặt trong middleware auth)
-      const resTypes = await fetch('http://localhost:8000/api/room-types', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (resTypes.ok) {
-        const dataTypes = await resTypes.json();
-        setRoomTypes(dataTypes.data);
-      }
-    } catch (error) {
-      console.error("Lỗi tải dữ liệu:", error);
-    }
-  };
-
   useEffect(() => {
+    let mounted = true;
+
+    const fetchData = async () => {
+      try {
+        // Lấy danh sách phòng
+        const resRooms = await fetch(`${API_BASE_URL}/api/rooms`);
+        if (resRooms.ok) {
+          const dataRooms = await resRooms.json();
+          if (mounted) setRooms(dataRooms.data);
+        }
+
+        // Lấy danh sách loại phòng (Bắt buộc phải có token vì đặt trong middleware auth)
+        const resTypes = await fetch(`${API_BASE_URL}/api/room-types`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resTypes.ok) {
+          const dataTypes = await resTypes.json();
+          if (mounted) setRoomTypes(dataTypes.data);
+        }
+      } catch (error) {
+        console.error("Lỗi tải dữ liệu:", error);
+      }
+    };
+
     fetchData();
-  }, []);
+    return () => { mounted = false; };
+  }, [token]);
 
   // 2. Mở Modal Thêm/Sửa
   const openModal = (room = null) => {
@@ -65,7 +68,7 @@ export default function AdminRooms() {
   // 3. Xử lý Lưu dữ liệu (Thêm mới hoặc Cập nhật)
   const handleSave = async (e) => {
     e.preventDefault();
-    const url = isEditing ? `http://localhost:8000/api/rooms/${formData.id}` : 'http://localhost:8000/api/rooms';
+    const url = isEditing ? `${API_BASE_URL}/api/rooms/${formData.id}` : `${API_BASE_URL}/api/rooms`;
     const method = isEditing ? 'PUT' : 'POST';
 
     try {
@@ -82,7 +85,16 @@ export default function AdminRooms() {
       if (response.ok) {
         alert(isEditing ? "Cập nhật phòng thành công!" : "Thêm phòng thành công!");
         setIsModalOpen(false);
-        fetchData(); // Load lại bảng
+        try {
+          // Reload list after save
+          const resRooms = await fetch(`${API_BASE_URL}/api/rooms`);
+          if (resRooms.ok) {
+            const dataRooms = await resRooms.json();
+            setRooms(dataRooms.data);
+          }
+        } catch (error) {
+          console.error("Lỗi tải dữ liệu:", error);
+        }
       } else {
         const errorData = await response.json();
         alert("Lỗi: " + (errorData.message || "Kiểm tra lại dữ liệu nhập."));
@@ -96,7 +108,7 @@ export default function AdminRooms() {
   const handleDelete = async (id) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa phòng này?")) {
       try {
-        const response = await fetch(`http://localhost:8000/api/rooms/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/rooms/${id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -104,7 +116,15 @@ export default function AdminRooms() {
           }
         });
         if (response.ok) {
-          fetchData(); // Load lại bảng
+          try {
+            const resRooms = await fetch(`${API_BASE_URL}/api/rooms`);
+            if (resRooms.ok) {
+              const dataRooms = await resRooms.json();
+              setRooms(dataRooms.data);
+            }
+          } catch (error) {
+            console.error("Lỗi tải dữ liệu:", error);
+          }
         }
       } catch (error) {
         console.error("Lỗi xóa phòng:", error);

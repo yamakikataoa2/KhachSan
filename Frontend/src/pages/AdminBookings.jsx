@@ -1,32 +1,37 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/env';
 
 export default function AdminBookings() {
   const [bookings, setBookings] = useState([]);
   const token = localStorage.getItem('userToken');
 
-  const fetchBookings = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/bookings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setBookings(data.data);
-      }
-    } catch (error) {
-      console.error("Lỗi tải danh sách:", error);
-    }
-  };
-
   useEffect(() => {
+    let mounted = true;
+
+    const fetchBookings = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/bookings`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!mounted) return;
+        if (response.ok) {
+          const data = await response.json();
+          setBookings(data.data);
+        }
+      } catch (error) {
+        console.error("Lỗi tải danh sách:", error);
+      }
+    };
+
     fetchBookings();
-  }, []);
+    return () => { mounted = false; };
+  }, [token]);
 
   // Xử lý đổi trạng thái
   const handleStatusChange = async (id, newStatus) => {
     if (window.confirm(`Bạn muốn chuyển trạng thái đơn này thành "${newStatus}"?`)) {
       try {
-        const response = await fetch(`http://localhost:8000/api/bookings/${id}/status`, {
+        const response = await fetch(`${API_BASE_URL}/api/bookings/${id}/status`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -37,7 +42,14 @@ export default function AdminBookings() {
         });
 
         if (response.ok) {
-          fetchBookings(); // Cập nhật lại bảng
+          // Reload table after update
+          const reload = await fetch(`${API_BASE_URL}/api/bookings`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (reload.ok) {
+            const data = await reload.json();
+            setBookings(data.data);
+          }
         } else {
           alert("Có lỗi xảy ra khi cập nhật!");
         }

@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../config/env';
+import { resolveImageUrl } from '../utils/urls';
 
 export default function AdminRoomTypes() {
   const [roomTypes, setRoomTypes] = useState([]);
@@ -12,10 +14,9 @@ export default function AdminRoomTypes() {
 
   const token = localStorage.getItem('userToken');
 
-  // 1. Tải danh sách Loại Phòng
-  const fetchRoomTypes = async () => {
+  const reloadRoomTypes = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/room-types', {
+      const response = await fetch(`${API_BASE_URL}/api/room-types`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -24,22 +25,24 @@ export default function AdminRoomTypes() {
       if (response.ok) {
         const data = await response.json();
         setRoomTypes(data.data);
+      } else {
+        console.error('Lỗi tải danh sách:', response.status, await response.text());
       }
     } catch (error) {
       console.error("Lỗi tải danh sách:", error);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    fetchRoomTypes();
-  }, []);
+    reloadRoomTypes();
+  }, [reloadRoomTypes]);
 
   // 2. Mở Modal
   const openModal = (type = null) => {
     if (type) {
       setIsEditing(true);
       setFormData({ ...type, image: null });
-      setImagePreview(type.image ? `http://localhost:8000/storage/${type.image}` : null);
+      setImagePreview(resolveImageUrl(type.image_url || type.image));
     } else {
       setIsEditing(false);
       setFormData({ id: null, name: '', base_price: '', max_occupancy: '', description: '', image: null });
@@ -64,8 +67,7 @@ export default function AdminRoomTypes() {
   // 4. Lưu dữ liệu (Thêm/Sửa)
   const handleSave = async (e) => {
     e.preventDefault();
-    const url = isEditing ? `http://localhost:8000/api/room-types/${formData.id}` : 'http://localhost:8000/api/room-types';
-    const method = isEditing ? 'POST' : 'POST'; // Laravel sử dụng POST cho update với _method
+    const url = isEditing ? `${API_BASE_URL}/api/room-types/${formData.id}` : `${API_BASE_URL}/api/room-types`;
 
     try {
       // Tạo FormData để gửi file
@@ -93,7 +95,7 @@ export default function AdminRoomTypes() {
       if (response.ok) {
         alert(isEditing ? "Cập nhật thành công!" : "Thêm loại phòng thành công!");
         setIsModalOpen(false);
-        fetchRoomTypes();
+        reloadRoomTypes();
       } else {
         const errorData = await response.json();
         alert("Lỗi: " + (errorData.message || "Vui lòng kiểm tra lại thông tin"));
@@ -108,7 +110,7 @@ export default function AdminRoomTypes() {
   const handleDelete = async (id) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa loại phòng này?")) {
       try {
-        const response = await fetch(`http://localhost:8000/api/room-types/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/room-types/${id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -117,7 +119,7 @@ export default function AdminRoomTypes() {
         });
         
         if (response.ok) {
-          fetchRoomTypes();
+          reloadRoomTypes();
         } else {
           const errorData = await response.json();
           alert("Lỗi: " + errorData.message);
@@ -160,11 +162,19 @@ export default function AdminRoomTypes() {
               {roomTypes.map((type) => (
                 <tr key={type.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
                   <td className="p-4">
-                    {type.image ? (
-                      <img src={`http://localhost:8000/storage/${type.image}`} alt={type.name} className="w-16 h-16 object-cover rounded-lg" />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">📸</div>
-                    )}
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 flex items-center justify-center text-gray-400 relative">
+                      <span className="select-none">📸</span>
+                      {resolveImageUrl(type.image_url || type.image) && (
+                        <img
+                          src={resolveImageUrl(type.image_url || type.image)}
+                          alt={type.name}
+                          className="w-16 h-16 object-cover absolute"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      )}
+                    </div>
                   </td>
                   <td className="p-4 font-bold text-gray-800">{type.name}</td>
                   <td className="p-4 text-indigo-600 font-bold">

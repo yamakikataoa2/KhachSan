@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import roomImg from '../assets/hero.png'; // 👈 Dùng luôn ảnh nội bộ của bạn cho chắc ăn!
+import { API_BASE_URL } from '../config/env';
+import { resolveImageUrl } from '../utils/urls';
 
 export default function Rooms() {
   const [roomTypesDisplay, setRoomTypesDisplay] = useState([]);
@@ -9,7 +11,7 @@ export default function Rooms() {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/rooms');
+        const response = await fetch(`${API_BASE_URL}/api/rooms`);
         if (response.ok) {
           const data = await response.json();
           
@@ -79,7 +81,7 @@ export default function Rooms() {
                 {/* Ảnh minh họa */}
                 <div className="h-64 bg-gray-200 relative overflow-hidden">
                   <img 
-                    src={item.typeInfo.image ? `http://localhost:8000/storage/${item.typeInfo.image}` : roomImg}
+                    src={resolveImageUrl(item.typeInfo.image_url || item.typeInfo.image) || roomImg}
                     alt={item.typeInfo.name} 
                     className="w-full h-full object-cover"
                   />

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/env';
 
 export default function AdminUsers() {
   // 1. Khởi tạo mảng rỗng thay vì mock data
@@ -14,28 +15,31 @@ export default function AdminUsers() {
   // Lấy Token từ trình duyệt để xác thực quyền Admin
   const token = localStorage.getItem('userToken');
 
-  // 2. HÀM TẢI DANH SÁCH TÀI KHOẢN TỪ BACKEND
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.data); // Gán dữ liệu thật vào state
-      }
-    } catch (error) {
-      console.error("Lỗi tải danh sách:", error);
-    }
-  };
-
   // Tự động gọi API khi vừa mở trang
   useEffect(() => {
+    let mounted = true;
+
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/users`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+        if (!mounted) return;
+        if (response.ok) {
+          const data = await response.json();
+          setUsers(data.data); // Gán dữ liệu thật vào state
+        }
+      } catch (error) {
+        console.error("Lỗi tải danh sách:", error);
+      }
+    };
+
     fetchUsers();
-  }, []);
+    return () => { mounted = false; };
+  }, [token]);
 
   // Xử lý mở Modal
   const openModal = (user = null) => {
@@ -52,7 +56,7 @@ export default function AdminUsers() {
   // 3. HÀM LƯU (THÊM / SỬA) TÀI KHOẢN LÊN BACKEND
   const handleSave = async (e) => {
     e.preventDefault();
-    const url = isEditing ? `http://localhost:8000/api/users/${formData.id}` : 'http://localhost:8000/api/users';
+    const url = isEditing ? `${API_BASE_URL}/api/users/${formData.id}` : `${API_BASE_URL}/api/users`;
     const method = isEditing ? 'PUT' : 'POST';
 
     try {
@@ -69,7 +73,20 @@ export default function AdminUsers() {
       if (response.ok) {
         alert(isEditing ? "Cập nhật thành công!" : "Tạo tài khoản thành công!");
         setIsModalOpen(false);
-        fetchUsers(); // Gọi lại API để làm mới bảng
+        try {
+          const reload = await fetch(`${API_BASE_URL}/api/users`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json'
+            }
+          });
+          if (reload.ok) {
+            const data = await reload.json();
+            setUsers(data.data);
+          }
+        } catch (error) {
+          console.error("Lỗi tải danh sách:", error);
+        }
       } else {
         const errorData = await response.json();
         alert("Lỗi: " + (errorData.message || "Vui lòng kiểm tra lại thông tin"));
@@ -87,7 +104,7 @@ export default function AdminUsers() {
     }
     if (window.confirm("Bạn có chắc chắn muốn xóa tài khoản này?")) {
       try {
-        const response = await fetch(`http://localhost:8000/api/users/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -95,7 +112,20 @@ export default function AdminUsers() {
           }
         });
         if (response.ok) {
-          fetchUsers(); // Làm mới bảng sau khi xóa
+          try {
+            const reload = await fetch(`${API_BASE_URL}/api/users`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+              }
+            });
+            if (reload.ok) {
+              const data = await reload.json();
+              setUsers(data.data);
+            }
+          } catch (error) {
+            console.error("Lỗi tải danh sách:", error);
+          }
         }
       } catch (error) {
         console.error("Lỗi xóa tài khoản:", error);

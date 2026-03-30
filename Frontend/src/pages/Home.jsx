@@ -1,12 +1,55 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../config/env';
+import { resolveImageUrl } from '../utils/urls';
+import roomFallbackImg from '../assets/hero.png';
 
 export default function Home() {
-  // Mock dữ liệu 3 phòng nổi bật để hiển thị trên trang chủ
-  const featuredRooms = [
-    { id: 1, name: "Phòng Tiêu Chuẩn Luxury", image: "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=600&auto=format&fit=crop", price: "800.000", description: "Không gian ấm cúng, đầy đủ tiện nghi cho cặp đôi." },
-    { id: 2, name: "Phòng VIP Panorama", image: "https://images.unsplash.com/photo-1590490360182-c33d59735088?q=80&w=600&auto=format&fit=crop", price: "1.500.000", description: "Tầm nhìn 360 độ toàn thành phố, dịch vụ thượng hạng." },
-    { id: 3, name: "Phòng Gia Đình Royal", image: "https://images.unsplash.com/photo-1608198399264-39fe42ca1d2d?q=80&w=600&auto=format&fit=crop", price: "2.200.000", description: "Rộng rãi, thiết kế sang trọng, có khu vực bếp riêng." },
-  ];
+  const [featuredRoomTypes, setFeaturedRoomTypes] = useState([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchFeatured = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/rooms`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const rooms = Array.isArray(data?.data) ? data.data : [];
+
+        const typeMap = new Map();
+        for (const room of rooms) {
+          const type = room?.room_type;
+          if (!type?.id) continue;
+
+          if (!typeMap.has(type.id)) {
+            typeMap.set(type.id, { typeInfo: type, availableRoom: null });
+          }
+          const entry = typeMap.get(type.id);
+          if (!entry.availableRoom && room?.status === 'Available') {
+            entry.availableRoom = room;
+          }
+        }
+
+        const types = Array.from(typeMap.values());
+        if (mounted) setFeaturedRoomTypes(types);
+      } catch {
+        // ignore; UI will show empty state
+      } finally {
+        if (mounted) setIsLoadingRooms(false);
+      }
+    };
+
+    fetchFeatured();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const topFeatured = useMemo(() => featuredRoomTypes.slice(0, 3), [featuredRoomTypes]);
 
   return (
     <div className="bg-white text-gray-800">
@@ -68,23 +111,82 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {featuredRooms.map((room) => (
-              <div key={room.id} className="bg-white rounded-xl shadow-md overflow-hidden border group hover:shadow-2xl transition-all duration-500">
-                <div className="overflow-hidden h-64">
-                    <img src={room.image} alt={room.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900">{room.name}</h3>
-                  <p className="text-gray-600 mt-2 h-12 line-clamp-2">{room.description}</p>
-                  <div className="flex justify-between items-center mt-6 border-t pt-4">
-                    <span className="text-xl font-bold text-orange-600">{room.price} VNĐ <span className="text-sm text-gray-500 font-normal">/ đêm</span></span>
-                    <Link to={`/booking/${room.id}`} className="bg-gray-900 hover:bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold text-sm transition transition-colors">
-                      Đặt Ngay
-                    </Link>
+            {isLoadingRooms ? (
+              Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="bg-white rounded-xl shadow-md overflow-hidden border animate-pulse">
+                  <div className="h-64 bg-gray-200" />
+                  <div className="p-6 space-y-3">
+                    <div className="h-5 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 rounded w-full" />
+                    <div className="h-4 bg-gray-200 rounded w-5/6" />
+                    <div className="h-10 bg-gray-200 rounded w-full mt-6" />
                   </div>
                 </div>
+              ))
+            ) : topFeatured.length === 0 ? (
+              <div className="md:col-span-3 text-center text-gray-500 py-10 bg-gray-50 rounded-xl border">
+                Hiện chưa có phòng để hiển thị. Vui lòng quay lại sau.
               </div>
-            ))}
+            ) : (
+              topFeatured.map((item) => {
+                const type = item.typeInfo;
+                const img = resolveImageUrl(type?.image_url || type?.image) || roomFallbackImg;
+                const canBook = Boolean(item.availableRoom?.id);
+
+                return (
+                  <div key={type.id} className="bg-white rounded-xl shadow-md overflow-hidden border group hover:shadow-2xl transition-all duration-500">
+                    <div className="overflow-hidden h-64 bg-gray-200">
+                      <img
+                        src={img}
+                        alt={type.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          e.currentTarget.src = roomFallbackImg;
+                        }}
+                      />
+                    </div>
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold text-gray-900">{type.name}</h3>
+                      <p className="text-gray-600 mt-2 h-12 line-clamp-2">
+                        {type.description || 'Trải nghiệm không gian tuyệt vời với đầy đủ tiện nghi tiêu chuẩn.'}
+                      </p>
+                      <div className="flex justify-between items-center mt-6 border-t pt-4 gap-4">
+                        <span className="text-xl font-bold text-orange-600 whitespace-nowrap">
+                          {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(type.base_price)}
+                          <span className="text-sm text-gray-500 font-normal"> / đêm</span>
+                        </span>
+                        {canBook ? (
+                          <Link
+                            to={`/booking/${item.availableRoom.id}`}
+                            className="bg-gray-900 hover:bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold text-sm transition-colors"
+                          >
+                            Đặt Ngay
+                          </Link>
+                        ) : (
+                          <button
+                            disabled
+                            className="bg-gray-300 text-gray-600 px-5 py-2 rounded-lg font-semibold text-sm cursor-not-allowed"
+                          >
+                            Hết phòng
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="text-center mt-10">
+            <Link
+              to="/rooms"
+              className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold transition shadow-md"
+            >
+              Xem tất cả phòng <span>→</span>
+            </Link>
           </div>
         </div>
       </section>

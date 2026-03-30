@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config/env';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -17,7 +18,7 @@ export default function Login() {
 
     try {
       // 1. Gọi API đến Backend Laravel
-      const response = await fetch('http://localhost:8000/api/login', {
+      const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
