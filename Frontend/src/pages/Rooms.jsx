@@ -13,25 +13,27 @@ export default function Rooms() {
         if (response.ok) {
           const data = await response.json();
           
-          // 1. Chỉ lấy những phòng đang "Available" (Trống)
-          const availableRooms = data.data.filter(room => room.status === 'Available');
+          // Nhóm phòng theo room_type_id để hiển thị tất cả loại phòng
+          const typeMap = {};
           
-          // 2. GỘP NHÓM LOẠI PHÒNG: Chỉ hiển thị 1 Thẻ đại diện cho mỗi Loại
-          const uniqueTypes = [];
-          const seenTypeIds = new Set();
-          
-          availableRooms.forEach(room => {
-            if (room.room_type && !seenTypeIds.has(room.room_type.id)) {
-              seenTypeIds.add(room.room_type.id);
-              // Lưu thông tin Loại phòng, kèm theo ID của 1 phòng trống để truyền sang trang Đặt
-              uniqueTypes.push({
-                typeInfo: room.room_type,
-                sampleRoomId: room.id,
-                sampleRoomNumber: room.room_number
-              });
+          data.data.forEach(room => {
+            if (room.room_type) {
+              const typeId = room.room_type.id;
+              if (!typeMap[typeId]) {
+                typeMap[typeId] = {
+                  typeInfo: room.room_type,
+                  availableRoom: null  // Sẽ lưu phòng trống đầu tiên của loại này
+                };
+              }
+              // Nếu chưa có phòng trống thuộc loại này, lưu phòng này
+              if (!typeMap[typeId].availableRoom && room.status === 'Available') {
+                typeMap[typeId].availableRoom = room;
+              }
             }
           });
           
+          // Chuyển object thành array
+          const uniqueTypes = Object.values(typeMap);
           setRoomTypesDisplay(uniqueTypes);
         }
       } catch (error) {
@@ -65,7 +67,7 @@ export default function Rooms() {
           /* Trạng thái Hết phòng trống */
           <div className="text-center text-gray-500 py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
             <span className="text-6xl mb-4 block">🏨</span>
-            <p className="text-xl font-medium text-gray-700">Hiện tại khách sạn đã hết phòng trống.</p>
+            <p className="text-xl font-medium text-gray-700">Không có loại phòng nào.</p>
             <p className="mt-2 text-gray-500">Vui lòng quay lại sau hoặc liên hệ hotline để được hỗ trợ!</p>
           </div>
         ) : (
@@ -82,8 +84,12 @@ export default function Rooms() {
                     className="w-full h-full object-cover"
                   />
                   {/* Badge Trạng thái */}
-                  <div className="absolute top-4 right-4 bg-green-500/90 backdrop-blur text-white font-extrabold px-4 py-1.5 rounded-full text-sm shadow-md border border-white/20">
-                    Đang trống
+                  <div className={`absolute top-4 right-4 font-extrabold px-4 py-1.5 rounded-full text-sm shadow-md border backdrop-blur ${
+                    item.availableRoom 
+                      ? 'bg-green-500/90 text-white border-white/20' 
+                      : 'bg-red-500/90 text-white border-white/20'
+                  }`}>
+                    {item.availableRoom ? 'Đang trống' : 'Hết phòng'}
                   </div>
                 </div>
 
@@ -116,13 +122,22 @@ export default function Rooms() {
                         {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.typeInfo.base_price)}
                       </p>
                     </div>
-                    {/* Nút Đặt phòng sẽ truyền ID phòng mẫu sang trang Booking */}
-                    <Link 
-                      to={`/booking/${item.sampleRoomId}`}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-md hover:shadow-lg flex items-center gap-2"
-                    >
-                      Đặt Ngay <span>→</span>
-                    </Link>
+                    {/* Nút Đặt phòng */}
+                    {item.availableRoom ? (
+                      <Link 
+                        to={`/booking/${item.availableRoom.id}`}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-md hover:shadow-lg flex items-center gap-2"
+                      >
+                        Đặt Ngay <span>→</span>
+                      </Link>
+                    ) : (
+                      <button
+                        disabled
+                        className="bg-gray-400 text-white px-6 py-3 rounded-xl font-bold cursor-not-allowed flex items-center gap-2"
+                      >
+                        Hết Phòng
+                      </button>
+                    )}
                   </div>
                 </div>
 

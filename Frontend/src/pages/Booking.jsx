@@ -101,7 +101,7 @@ export default function Booking() {
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
               <div>
                 <p className="text-sm text-blue-600 font-bold uppercase tracking-wider">Phòng đang chọn</p>
-                <p className="text-2xl font-black text-gray-900">{roomNumber}</p>
+                <p className="text-2xl font-black text-gray-900">#{roomId}</p>
               </div>
               <div className="text-4xl">🏨</div>
             </div>

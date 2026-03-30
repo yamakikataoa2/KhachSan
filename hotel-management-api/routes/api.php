@@ -27,6 +27,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/room-types/{id}', [RoomTypeController::class, 'update']);
     Route::delete('/room-types/{id}', [RoomTypeController::class, 'destroy']);
 
+
+
     // API mặc định lấy thông tin user
     Route::get('/user', function (Request $request) {
         return $request->user();

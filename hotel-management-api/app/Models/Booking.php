@@ -2,16 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Booking extends Model
 {
-    // Báo cho Laravel biết bảng này không có cột updated_at
-    const UPDATED_AT = null; 
+    use HasFactory;
 
-    protected $fillable = ['user_id', 'check_in_date', 'check_out_date', 'total_price', 'status'];
+    // Cho phép lưu các cột này
+    protected $fillable = [
+        'user_id', 'room_id', 'customer_name', 'customer_phone', 
+        'check_in_date', 'check_out_date', 'total_price', 'status', 'note'
+    ];
 
-    public function user() {
-        return $this->belongsTo(User::class);
+    // Thêm hàm này: Một đơn đặt phòng sẽ THUỘC VỀ một Căn phòng
+    public function room()
+    {
+        return $this->belongsTo(Room::class, 'room_id', 'id');
     }
 }
